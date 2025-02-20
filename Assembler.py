@@ -70,3 +70,31 @@ I_Type = {
         "addi": {"opcode": "0010011", "funct3": "000"},
         "jalr": {"opcode": "1100111", "funct3": "000"}
 }
+
+# S-Type Instruction
+    elif data.split()[0] in S_Type:
+        opcode = S_Type[data.split()[0]]["opcode"]
+        funct3 = S_Type[data.split()[0]]["funct3"]
+        data = data.replace(",", " ")
+        input_str = data.split()[2]
+        opening_index = input_str.find('(')
+        num_str = input_str[:opening_index]
+        result = int(num_str)
+        opening_index = input_str.find('(')
+        closing_index = input_str.find(')')
+        substring = input_str[opening_index + 1:closing_index]
+
+        if result >= 0:
+            bina = bin(result)[2:].zfill(12)
+        else:
+            bina = bin(abs(result))[2:].zfill(12)
+            bina = bina.replace("0", "X").replace("1", "0").replace("X", "1")
+            result = funct1(bina, "1")
+            bina = result
+
+        if substring not in Registers or data.split()[1] not in Registers:
+            f_ans.append("Error: Invalid register")
+            continue
+
+        output = bina[0:7] + Registers[data.split()[1]] + Registers[substring] + funct3 + bina[7:] + opcode
+        f_ans.append(output)
