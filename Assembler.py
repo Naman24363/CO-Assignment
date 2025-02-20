@@ -71,6 +71,145 @@ I_Type = {
         "jalr": {"opcode": "1100111", "funct3": "000"}
 }
 
+def funct1(a: str, b: str) -> str: #2's complement
+    s = []
+    carry = 0
+    i = len(a) - 1
+    j = len(b) - 1
+    while i >= 0 or j >= 0 or carry:
+        if i >= 0:
+            carry += int(a[i])
+            i -= 1
+        if j >= 0:
+            carry += int(b[j])
+            j -= 1
+        s.append(str(carry % 2))
+        carry //= 2
+    return ''.join(reversed(s))
+
+
+def funct2(lines): #parse_mips
+    labels = {}
+    for idx, line in enumerate(lines, 1):
+        if ':' in line:
+            label = line.split(':')[0].strip()
+            labels[label] = idx
+    return labels
+
+
+def funct3(lines): #remove labels
+    l = []
+    for line in lines:
+        if ':' in line:
+            label, statement = line.split(':', 1)
+            l.append(statement.strip())
+        else:
+            l.append(line.strip())
+    return l
+
+
+with open(input_file, 'r') as file:
+    lines = file.readlines()
+
+labels = funct2(lines)
+l = funct3(lines)
+
+z = 0
+
+for line in lines:
+    data = line.strip()
+    if not data:
+        continue
+
+    for i, char in enumerate(data):
+        if char == ':':
+            data = data[i + 1:]
+
+    z += 1
+    if data.split()[0] in B_type:
+        data = data.replace(",", " ")
+        if data.split()[3] in labels.keys():
+            data_list = list(data.split())
+            j = str(4 * (labels[data_list[3]] - z))
+            data_list[3] = j
+            data = ' '.join(data_list)
+        
+        decimal_num = int(data.split()[3])
+        if decimal_num >= 0:
+            bina = bin(decimal_num)[2:].zfill(13) 
+        else:
+            bina = bin(abs(decimal_num))[2:].zfill(13)
+            bina = bina.replace("0", "X").replace("1", "0").replace("X", "1")  
+            bina = funct1(bina, "1")
+        bina = bina[-13:]
+        # print(bina)
+
+        imm12 = bina[0]    
+        imm10_5 = bina[1:7]  
+        imm4_1 = bina[8:12]  
+        # print(imm4_1)
+        imm11 = bina[1]   
+
+        opcode = B_type[data.split()[0]]["opcode"]
+        funct3 = B_type[data.split()[0]]["funct3"]
+        if data.split()[2] not in Registers or data.split()[1] not in Registers:
+            f_ans.append("Error: Invalid register")
+            continue 
+        output = (
+            imm12 + imm10_5 + Registers[data.split()[2]] +
+            Registers[data.split()[1]] + funct3 + imm4_1 + imm11 + opcode
+        )
+
+        f_ans.append(output)
+
+    # R-Type Instruction
+    elif data.split()[0] in R_Type:
+        opcode = R_Type[data.split()[0]]["opcode"]
+        funct3 = R_Type[data.split()[0]]["funct3"]
+        funct7 = R_Type[data.split()[0]]["funct7"]
+        data = data.replace(",", " ")
+
+        if data.split()[2] not in Registers or data.split()[1] not in Registers or data.split()[3] not in Registers:
+            f_ans.append("Error: Invalid register")
+            continue
+
+        output = funct7 + Registers[data.split()[3]] + Registers[data.split()[2]] + funct3 + Registers[data.split()[1]] + opcode
+        f_ans.append(output)
+
+        # I-Type Instruction
+    elif data.split()[0] in I_Type:
+        opcode = I_Type[data.split()[0]]["opcode"]
+        funct3 = I_Type[data.split()[0]]["funct3"]
+        data = data.replace(",", " ")
+
+        if len(data.split()) == 3:
+            input_str = data.split()[2]
+            opening_index = input_str.find('(')
+            number_string = input_str[:opening_index]
+            decimal = int(number_string)
+            opening_index = input_str.find('(')
+            closing_index = input_str.find(')')
+            fin_reg = input_str[opening_index + 1:closing_index]
+        else:
+            decimal = int(data.split()[3])
+            fin_reg = data.split()[2]
+
+        if decimal < 0:
+            bina = bin(abs(decimal))[2:].zfill(12)
+            bina = bina.replace("0", "X").replace("1", "0").replace("X", "1")
+            result = funct1(bina, "1")
+            imm = result
+        else:
+            imm = bin(decimal)[2:].zfill(12)
+
+        if fin_reg not in Registers or data.split()[1] not in Registers:
+            f_ans.append("Error: Invalid register")
+            continue
+
+        output = imm + Registers[fin_reg] + funct3 + Registers[data.split()[1]] + opcode
+        f_ans.append(output)
+    
+
 # S-Type Instruction
     elif data.split()[0] in S_Type:
         opcode = S_Type[data.split()[0]]["opcode"]
