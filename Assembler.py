@@ -162,7 +162,7 @@ for line in lines:
 
         f_ans.append(output)
 
-    # R-Type Instruction
+        # R-Type Instruction
     elif data.split()[0] in R_Type:
         opcode = R_Type[data.split()[0]]["opcode"]
         funct3 = R_Type[data.split()[0]]["funct3"]
@@ -209,8 +209,7 @@ for line in lines:
         output = imm + Registers[fin_reg] + funct3 + Registers[data.split()[1]] + opcode
         f_ans.append(output)
     
-
-# S-Type Instruction
+        # S-Type Instruction
     elif data.split()[0] in S_Type:
         opcode = S_Type[data.split()[0]]["opcode"]
         funct3 = S_Type[data.split()[0]]["funct3"]
@@ -237,3 +236,41 @@ for line in lines:
 
         output = bina[0:7] + Registers[data.split()[1]] + Registers[substring] + funct3 + bina[7:] + opcode
         f_ans.append(output)
+
+        # J-TYPE INSTRUCTION
+    elif data.split()[0] == "jal":
+        data = data.replace(",", " ")
+        opcode = "1101111"
+
+        target = data.split()[2]
+
+        if target in labels:
+            decimal_num = (labels[target] - z) * 4
+        else:
+            decimal_num = int(target)
+
+        if decimal_num >= 0:
+            bina = bin(decimal_num)[2:].zfill(21)
+        else:
+            bina = bin(abs(decimal_num))[2:].zfill(21)
+            bina = bina.replace("0", "X").replace("1", "0").replace("X", "1")
+            result = funct1(bina, "1")
+            bina = result.zfill(21)
+
+        immm = []
+        immm.append(bina[0])      # imm[20]
+        immm.extend(bina[10:20])  # imm[10:1]
+        immm.append(bina[9])      # imm[11]
+        immm.extend(bina[1:9])    # imm[19:12]
+        im = ''.join(immm)
+
+        if data.split()[1] not in Registers:
+            f_ans.append("Error: Invalid register")
+            continue
+
+        output = im + Registers[data.split()[1]] + opcode
+        f_ans.append(output)
+
+with open(output_file, 'w') as file:
+    for output in f_ans:
+        file.write(output + '\n')
