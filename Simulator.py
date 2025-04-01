@@ -1,57 +1,76 @@
-registers = [0] * 32  #32 registers
-memory = [0] * 1024   #word addressable memory
+registers = [i for i in range(32)]# 32 registers
+memory = [0] * 1024   # word-addressable memory
+pc = 0  # program counter
 
-#code of the program counter
-pc = 0
 def update_pc(offset=4):
     global pc
     pc += offset
 
-# Sign-extend a value with the given number of bits
-# this is for imm_I, imm_S, and imm_B
-# to convert the immediate value to a signed integer
 def sign_extend(value, bits):
-    if value & (1 << (bits - 1)):
-        value -= (1 << bits)
+    sign_bit = 1 << (bits - 1)
+    if (value & sign_bit) != 0:
+        extended_value = value - (1 << bits)
+    else:
+        extended_value = value
+    return extended_value
+
+# convert instruction to list MSB to LSB
+def list_maker(instruction):
+    bits = []
+    for i in range(31, -1, -1):
+        bit = (instruction >> i) & 1
+        bits.append(bit)
+    return bits
+
+
+# Convert list to integer MSB to LSB
+def int_maker(bits):
+    value = 0
+    for bit in bits:
+        value = (value << 1) | bit
     return value
 
-
-#extract diffrent bits of information from 32 bit instruction
+# Extract fields from the bit array
 def extract_fields(instruction):
-    opcode = instruction & 0x7F          # 0-6
-    rd = (instruction >> 7) & 0x1F       # 7-11
-    func3 = (instruction >> 12) & 0x07   # 12-14
-    rs1 = (instruction >> 15) & 0x1F     # 15-19
-    rs2 = (instruction >> 20) & 0x1F     # 20-24
-    func7 = (instruction >> 25) & 0x7F   # 25-31
+    opcode_bits = instruction[25:32]
+    rd_bits = instruction[20:25]
+    func3_bits = instruction[17:20]
+    rs1_bits = instruction[12:17]
+    rs2_bits = instruction[7:12]
+    func7_bits = instruction[0:7]
 
-    imm_I = sign_extend((instruction >> 20) & 0xFFF, 12)  
-    imm_S = sign_extend(((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F), 12)  
-    imm_B = sign_extend(((instruction >> 31) << 12) | ((instruction >> 7) & 0x1E) | 
-                        ((instruction >> 25) & 0x3F) << 5 | ((instruction >> 8) & 0x01) << 11, 13)
+    opcode = int_maker(opcode_bits)
+    rd = int_maker(rd_bits)
+    func3 = int_maker(func3_bits)
+    rs1 = int_maker(rs1_bits)
+    rs2 = int_maker(rs2_bits)
+    func7 = int_maker(func7_bits)
 
-    imm_J = sign_extend(((instruction >> 31) << 20) | ((instruction >> 12) & 0xFF) << 12 |
-                        ((instruction >> 20) & 0x1) << 11 | ((instruction >> 21) & 0x3FF) << 1, 21)
+    imm_I_bits = instruction[0:12]
+    imm_S_bits = instruction[0:7] + instruction[20:25]
+    imm_B_bits = [instruction[0]] + [instruction[24]] + instruction[1:7] + instruction[20:24] + [0]
+    imm_J_bits = [instruction[0]] + instruction[12:20] + [instruction[11]] + instruction[1:11] + [0]
+
+    imm_I = sign_extend(int_maker(imm_I_bits), 12)
+    imm_S = sign_extend(int_maker(imm_S_bits), 12)
+    imm_B = sign_extend(int_maker(imm_B_bits), 13)
+    imm_J = sign_extend(int_maker(imm_J_bits), 21)
 
     return opcode, rd, func3, rs1, rs2, func7, imm_I, imm_S, imm_B, imm_J
 
 
-
-#function to fetch the instruction from memory
 def get_instruction(memory):
-        global pc
-        instruction = memory[pc // 4]
-        return instruction
-
-
-
-#function to execute the 32 bit instruction
-def execute(instruction):
     global pc
-    opcode, rd, func3, rs1, rs2, func7, imm_I, imm_S, imm_B = extract_fields(instruction)
+    index = pc // 4
+    instruction = memory[index]
+    instruction_bits = list_maker(instruction)
+    return instruction_bits
 
-    # R-Type Instructions
-    if opcode == 0b0110011:
+def execute(bits):
+    global pc
+    opcode, rd, func3, rs1, rs2, func7, imm_I, imm_S, imm_B, imm_J = extract_fields(bits)
+
+    if opcode == 0b0110011:  # R-Type
         if func3 == 0b000 and func7 == 0b0000000:  # ADD
             registers[rd] = registers[rs1] + registers[rs2]
         elif func3 == 0b000 and func7 == 0b0100000:  # SUB
@@ -66,27 +85,24 @@ def execute(instruction):
             registers[rd] = registers[rs1] & registers[rs2]
         update_pc()
 
-    # I-Type Instructions
-    elif opcode == 0b0010011:  # ADDI
+    elif opcode == 0b0010011:  # ADDI (I-Type)
         registers[rd] = registers[rs1] + imm_I
         update_pc()
-    
-    elif opcode == 0b0000011 and func3 == 0b010:  # LW
-        registers[rd] = memory[(registers[rs1] + imm_I) // 4]  # Load from memory
-        update_pc()
-    
-    elif opcode == 0b1100111 and func3 == 0b000:  # JALR
-        registers[rd] = pc + 4
-        pc = (registers[rs1] + imm_I) & ~1  #PC is even
-        return True  #no increment in pc
 
-    # S-Type Instruction
-    elif opcode == 0b0100011 and func3 == 0b010:  # SW
+    elif opcode == 0b0000011 and func3 == 0b010:  # LW (I-Type)
+        registers[rd] = memory[(registers[rs1] + imm_I) // 4]
+        update_pc()
+
+    elif opcode == 0b1100111 and func3 == 0b000:  # JALR (I-Type)
+        registers[rd] = pc + 4
+        pc = (registers[rs1] + imm_I) & ~1
+        return True
+
+    elif opcode == 0b0100011 and func3 == 0b010:  # SW (S-Type)
         memory[(registers[rs1] + imm_S) // 4] = registers[rs2]
         update_pc()
 
-    # B-Type Instructions
-    elif opcode == 0b1100011:
+    elif opcode == 0b1100011:  # B-Type
         if func3 == 0b000:  # BEQ
             if registers[rs1] == registers[rs2]:
                 update_pc(imm_B)
@@ -98,16 +114,14 @@ def execute(instruction):
             else:
                 update_pc()
 
-    # HALT
-    elif opcode == 0b1111111:
-        return False  
-
+    elif opcode == 0b1111111:  # HALT
+        return False
+    registers[0] = 0  # x0 always stays 0
     return True
 
-#function to run the simulator
 def run(memory):
     global pc
     while True:
-        current_instruction = get_instruction(memory)
-        if not execute(current_instruction):
+        instruction_bits = get_instruction(memory)
+        if not execute(instruction_bits):
             break
