@@ -1,6 +1,6 @@
 # CO-Assignment
 This is our Co-Project Assignment
-In this we have made a working assembler fot R,I,B,J,S type instructions
+In this we have made a working assembler and the simulator for R,I,B,J,S type instructions
 Our group has the following people - 
     1. Anoushka Malik - 2024086
     2. Cho Hnin Lwin - 2024165
