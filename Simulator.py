@@ -1,129 +1,285 @@
 import sys
+r = [0] * 32
+r[2] = 380
 
-registers = [i for i in range(32)]# 32 registers
-memory = [0] * 1024   # word-addressable memory
-pc = 0  # program counter
+def funct1(dec):
+    """Convert decimal to uppercase hexadecimal without '0x' prefix"""
+    map = {10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F'}
+    if dec == 0:
+        return '0'
+    h = ''
+    while dec > 0:
+        rem = dec % 16
+        if rem < 10:
+            h = str(rem) + h
+        else:
+            h = map[rem] + h
+        dec = dec // 16
+    return h
 
-def update_pc(offset=4):
-    global pc
-    pc += offset
+def Print_mem():
+    start = 65536  
+    for i in range(32):
+        addr = start + 4 * i
+        addr2= funct1(addr) 
+        mem_key = addr2.upper()
+        val = memory.get(mem_key, 0)
+        line = f"0x000{addr2}:0b{twos(val)}\n"
+        file.write(line)
 
-def sign_extend(value, bits):
-    sign_bit = 1 << (bits - 1)
-    if (value & sign_bit) != 0:
-        extended_value = value - (1 << bits)
+memory={}
+start = 65536
+for i in range(32):
+    memory[funct1(start + 4*i)] = 0
+
+x = {"PC" : 0}
+cycle = x["PC"]//4
+def funct2(num, bits): #to bin
+    if int(num) < 0:
+        num = (1 << bits) + int(num) 
+    s = ""
+    for i in range(bits):
+        s = str(int(num) % 2) + s
+        num //= 2
+    return "0b" + s
+
+def twos(num):
+  if num >= 0:
+    return format(num, '032b')
+  else:
+    pos = format(-num, '032b')
+    flip = ''.join('0' if bit == '1' else '1'
+                           for bit in pos)
+    ans = format(int(flip, 2) + 1, '032b')
+    return ans
+  
+def db(num, bits):
+  if int(num) < 0:
+      num = (1 << bits) + int(num) 
+  
+  s = ""
+  
+  for i in range(bits):
+      s = str(int(num) % 2) + s
+      num //= 2
+  return "0b" + s
+
+def funct4(bin): 
+    pow = len(bin)-2
+    dec = -int(bin[0]) * 2**(pow+1)
+    for i in bin[1:]:
+        if i == '1':
+            dec += 2**pow
+        pow -= 1
+    return dec
+
+def funct5(val): 
+    neg = val < 0
+    if neg:
+        val = -val
+    bins = bin(val)[2:] #bin_str
+    if neg:
+        str1 = ''.join('1' if bit == '0' else '0' for bit in bins) #inverted str
+        ans = list(str1)
+        for i in range(len(str1) - 1, -1, -1):
+            if ans[i] == '0':
+                ans[i] = '1'
+                break
+            else:
+                ans[i] = '0'
+        else:
+            ans.insert(0, '1')
+
+        return ''.join(ans)
     else:
-        extended_value = value
-    return extended_value
+        return bins
 
-# convert instruction to list MSB to LSB
-def list_maker(instruction):
-    bits = []
-    for i in range(31, -1, -1):
-        bit = (instruction >> i) & 1
-        bits.append(bit)
-    return bits
+def funct6(val,bits): #sign ext
+    if val[0]=='1':
+        return int(val,2)-(1<<bits)
+    return int(val,2)
 
+def funct8(bins):
+  if bins[0] == '1':
+    a = ''.join('1' if bit == '0' else '0' for bit in bins) 
+    dec = -1 * (int(a, 2) + 1)
+  else:
+    dec= int(bins, 2)
+  return dec
 
-# Convert list to integer MSB to LSB
-def int_maker(bits):
-    value = 0
-    for bit in bits:
-        value = (value << 1) | bit
-    return value
-
-# Extract fields from the bit array
-def extract_fields(instruction):
-    opcode_bits = instruction[25:32]
-    rd_bits = instruction[20:25]
-    func3_bits = instruction[17:20]
-    rs1_bits = instruction[12:17]
-    rs2_bits = instruction[7:12]
-    func7_bits = instruction[0:7]
-
-    opcode = int_maker(opcode_bits)
-    rd = int_maker(rd_bits)
-    func3 = int_maker(func3_bits)
-    rs1 = int_maker(rs1_bits)
-    rs2 = int_maker(rs2_bits)
-    func7 = int_maker(func7_bits)
-
-    imm_I_bits = instruction[0:12]
-    imm_S_bits = instruction[0:7] + instruction[20:25]
-    imm_B_bits = [instruction[0]] + [instruction[24]] + instruction[1:7] + instruction[20:24] + [0]
-    imm_J_bits = [instruction[0]] + instruction[12:20] + [instruction[11]] + instruction[1:11] + [0]
-
-    imm_I = sign_extend(int_maker(imm_I_bits), 12)
-    imm_S = sign_extend(int_maker(imm_S_bits), 12)
-    imm_B = sign_extend(int_maker(imm_B_bits), 13)
-    imm_J = sign_extend(int_maker(imm_J_bits), 21)
-
-    return opcode, rd, func3, rs1, rs2, func7, imm_I, imm_S, imm_B, imm_J
+def Type_R(I):
+    funct7 = I[:7]
+    rs2 = int(I[7:12], 2)
+    rs1 = int(I[12:17], 2)
+    funct3 = I[17:20]
+    rd = int(I[20:25], 2)
+    if funct7 == "0000000": 
+        if funct3 == "000":
+            r[rd] = r[rs1] + r[rs2]
+        elif funct3 == "010":  
+            r[rd] = 1 if r[rs1] < r[rs2] else 0
+        elif funct3 == "101": #slt
+            sh= r[rs2] & 0b11111
+            r[rd] = r[rs1] >>sh
+        elif funct3 == "110": 
+            r[rd] = r[rs1] | r[rs2]
+        elif funct3 == "111": 
+            r[rd] = r[rs1] & r[rs2]
 
 
-def get_instruction(memory):
-    global pc
-    index = pc // 4
-    instruction = memory[index]
-    instruction_bits = list_maker(instruction)
-    return instruction_bits
-
-def execute(bits):
-    global pc
-    opcode, rd, func3, rs1, rs2, func7, imm_I, imm_S, imm_B, imm_J = extract_fields(bits)
-
-    if opcode == 0b0110011:  # R-Type
-        if func3 == 0b000 and func7 == 0b0000000:  # ADD
-            registers[rd] = registers[rs1] + registers[rs2]
-        elif func3 == 0b000 and func7 == 0b0100000:  # SUB
-            registers[rd] = registers[rs1] - registers[rs2]
-        elif func3 == 0b010 and func7 == 0b0000000:  # SLT
-            registers[rd] = int(registers[rs1] < registers[rs2])
-        elif func3 == 0b101 and func7 == 0b0000000:  # SRL
-            registers[rd] = registers[rs1] >> registers[rs2]
-        elif func3 == 0b110 and func7 == 0b0000000:  # OR
-            registers[rd] = registers[rs1] | registers[rs2]
-        elif func3 == 0b111 and func7 == 0b0000000:  # AND
-            registers[rd] = registers[rs1] & registers[rs2]
-        update_pc()
-
-    elif opcode == 0b0010011:  # ADDI (I-Type)
-        registers[rd] = registers[rs1] + imm_I
-        update_pc()
-
-    elif opcode == 0b0000011 and func3 == 0b010:  # LW (I-Type)
-        registers[rd] = memory[(registers[rs1] + imm_I) // 4]
-        update_pc()
-
-    elif opcode == 0b1100111 and func3 == 0b000:  # JALR (I-Type)
-        registers[rd] = pc + 4
-        pc = (registers[rs1] + imm_I) & ~1
-        return True
-
-    elif opcode == 0b0100011 and func3 == 0b010:  # SW (S-Type)
-        memory[(registers[rs1] + imm_S) // 4] = registers[rs2]
-        update_pc()
-
-    elif opcode == 0b1100011:  # B-Type
-        if func3 == 0b000:  # BEQ
-            if registers[rs1] == registers[rs2]:
-                update_pc(imm_B)
+    elif funct7 == "0100000":
+        if funct3 == "000":
+            if (rs1 == 0):
+              r[rd] = 0 - r[rs2]
             else:
-                update_pc()
-        elif func3 == 0b001:  # BNE
-            if registers[rs1] != registers[rs2]:
-                update_pc(imm_B)
-            else:
-                update_pc()
+              r[rd] = r[rs1] - r[rs2]
+        else:
+          print("Invalid Instruction")
 
-    elif opcode == 0b1111111:  # HALT
-        return False
-    registers[0] = 0  # x0 always stays 0
-    return True
+def Load(I):
+    rs1 = int(I[-20:-15], 2)
+    rd = int(I[-12:-7], 2)
+    imm = I[:-20]
+    immf=funct4(imm)
+    funct3 = I[-15:-12]
+    if funct3 == "010": #lw
+        offset=immf+r[(rs1)]
+        offi=hex(offset)
+        r[rd]=memory[offi[2:]]
 
-def run(memory):
-    global pc
-    while True:
-        instruction_bits = get_instruction(memory)
-        if not execute(instruction_bits):
-            break
+def Type_I(I):
+    opcode = I[-7:]
+    rs1 = int(I[-20:-15], 2)
+    rd = int(I[-12:-7], 2)
+    imm = I[:-20]
+    funct3 = I[-15:-12]
+    if opcode == "0010011": 
+        if funct3 == "000":  
+            r[rd] = r[rs1] + funct8(imm)
+        elif funct3 == "011": 
+            if int(str(funct5(r[rs1])), 2) < int(imm, 2):
+                r[rd] = 1
+
+    elif opcode == "1100111": 
+        if funct3 == "000":
+            immd = funct8(imm) #imm_dec
+            target = (r[rs1] + immd) & ~1 
+            r[rd] = x["PC"] + 4  
+            x["PC"] = target-4
+            return
+
+def Type_B(I):
+    if(I[-32:-7]=="0"*25):
+        return x["PC"]
+    imm = I[-32] + I[-8] + I[-31:-25] + I[-12:-8]
+    rs1 = int(I[-20:-15], 2)
+    rs2 = int(I[-25:-20], 2)
+    funct3 = I[-15:-12]
+    if funct3 == "000": 
+        if r[rs1] == r[rs2]:
+            x["PC"] += funct8(imm[-12:]+"0")
+            x["PC"]-=4
+    elif funct3 == "001": 
+        if r[rs1] != r[rs2]:
+           
+            x["PC"] += funct8(imm[-12:]+"0")
+       
+            x["PC"]-=4
+    elif funct3 == "100": 
+        if r[rs1] < r[rs2]:
+            x["PC"] += funct8(imm[-12:]+"10")
+            x["PC"]-=4
+    elif funct3 == "101":  
+        if r[rs1] >= r[rs2]:
+            x["PC"] += funct8(imm[-12:]+"0")
+            x["PC"]-=4
+
+    elif funct3 == "110": 
+        if int(str(funct5(r[rs1])), 2) < int(str(funct5(r[rs2])), 2):
+            x["PC"] += funct8(imm[-12:]+"0")
+            x["PC"]-=4
+    elif funct3== "111":  
+        if int(str(funct5(r[rs1])), 2) >= int(str(funct5(r[rs2])), 2):
+            x["PC"] += funct8(imm[-12:]+"0")
+            x["PC"]-=4
+
+def Type_S(I):
+
+    imm1 = I[-32:-25]
+    imm2 = I[-12:-7]
+    imm = imm1 + imm2  
+    rs2 = int(I[-25:-20], 2)
+    rs1 = int(I[-20:-15], 2)
+    immf=funct4(imm)
+    funct3 = I[-15:-12]
+    if funct3 == "010":
+        offset=immf+r[rs1]
+        memory[funct1(offset)] = r[rs2]
+
+file = open(sys.argv[2], "w")
+# file = open("output.txt", "w")
+    
+def Print_reg():
+        file.write(db(x["PC"], 32) + " ")
+        for i in range(32):
+            ans = db(r[i], 32)
+            file.write(ans + " ") 
+        file.write("\n")
+
+
+def Type_J(I):
+    imm = I[0] + I[12:20] + I[11] + I[1:11]
+    
+    rd = int(I[20:25], 2) 
+    r[rd] = x["PC"] + 4 
+    x["PC"] =x["PC"]+funct8(imm+"0")
+    x["PC"]-=4
+ 
+# f = open("input.txt", "r")
+f = open(sys.argv[1], "r") 
+machine_code = f.read().splitlines()
+max_pc = len(machine_code)*4
+while x["PC"] < max_pc:
+    # print(memory)
+    I = machine_code[int(x["PC"]/4)]
+    opcode = I[-7:]
+    # print(opcode)
+    
+    # print(instruction)
+    if  I == "00000000000000000000000001100011":
+        break
+    if opcode == "0110011":
+        Type_R(I)
+        # x["PC"]+=4
+    elif opcode == "0000011":
+        Load(I)
+        # x["PC"]+=4
+    elif opcode == "0010011" or opcode == "1100111":
+        Type_I(I)
+        # continue 
+        # x["PC"]+=4
+    elif opcode == "0100011":
+        # print(opcode)
+        Type_S(I)
+        # print('s')
+        # x["PC"]+=4
+    elif opcode == "1100011":
+        Type_B(I)
+        # x[="PC"]+=4
+    elif opcode == "1101111":
+        Type_J(I)
+        # x["PC"]+=4
+        
+    elif I == "11100110000000000000000000000000":  # halt
+        print("Program halted.")
+
+    else:
+        print("Invalid instruction")
+        # x["PC"]+=4
+    r[0] = 0
+    x["PC"] += 4
+    # print(x["PC"])
+    Print_reg()
+Print_reg()
+Print_mem()
+file.close()
