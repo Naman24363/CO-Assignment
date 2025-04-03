@@ -1,3 +1,5 @@
+import sys
+
 registers = [i for i in range(32)]# 32 registers
 memory = [0] * 1024   # word-addressable memory
 pc = 0  # program counter
