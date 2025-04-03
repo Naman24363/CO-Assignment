@@ -197,4 +197,5 @@ while x["PC"] < max_pc:
     x["PC"] += 4
     Print_reg()
 Print_reg()
+Print_mem()
 file.close()
