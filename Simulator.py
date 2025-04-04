@@ -26,9 +26,87 @@ def Print_mem():
         val = memory.get(mem_key, 0)
         line = f"0x000{addr2}:0b{twos(val)}\n"
         file.write(line)
-        
-        
-        
+
+memory={}
+start = 65536
+for i in range(32):
+    memory[funct1(start + 4*i)] = 0
+
+x = {"PC" : 0}
+cycle = x["PC"]//4
+def funct2(num, bits): #to bin
+    if int(num) < 0:
+        num = (1 << bits) + int(num) 
+    s = ""
+    for i in range(bits):
+        s = str(int(num) % 2) + s
+        num //= 2
+    return "0b" + s
+
+def twos(num):
+  if num >= 0:
+    return format(num, '032b')
+  else:
+    pos = format(-num, '032b')
+    flip = ''.join('0' if bit == '1' else '1'
+                           for bit in pos)
+    ans = format(int(flip, 2) + 1, '032b')
+    return ans
+  
+def db(num, bits):
+  if int(num) < 0:
+      num = (1 << bits) + int(num) 
+  
+  s = ""
+  
+  for i in range(bits):
+      s = str(int(num) % 2) + s
+      num //= 2
+  return "0b" + s
+
+def funct4(bin): 
+    pow = len(bin)-2
+    dec = -int(bin[0]) * 2**(pow+1)
+    for i in bin[1:]:
+        if i == '1':
+            dec += 2**pow
+        pow -= 1
+    return dec
+
+def funct5(val): 
+    neg = val < 0
+    if neg:
+        val = -val
+    bins = bin(val)[2:] #bin_str
+    if neg:
+        str1 = ''.join('1' if bit == '0' else '0' for bit in bins) #inverted str
+        ans = list(str1)
+        for i in range(len(str1) - 1, -1, -1):
+            if ans[i] == '0':
+                ans[i] = '1'
+                break
+            else:
+                ans[i] = '0'
+        else:
+            ans.insert(0, '1')
+
+        return ''.join(ans)
+    else:
+        return bins
+
+def funct6(val,bits): #sign ext
+    if val[0]=='1':
+        return int(val,2)-(1<<bits)
+    return int(val,2)
+
+def funct8(bins):
+  if bins[0] == '1':
+    a = ''.join('1' if bit == '0' else '0' for bit in bins) 
+    dec = -1 * (int(a, 2) + 1)
+  else:
+    dec= int(bins, 2)
+  return dec
+
 def Type_R(I):
     funct7 = I[:7]
     rs2 = int(I[7:12], 2)
@@ -38,9 +116,9 @@ def Type_R(I):
     if funct7 == "0000000": 
         if funct3 == "000":
             r[rd] = r[rs1] + r[rs2]
-        elif funct3 == "010":  #slt
+        elif funct3 == "010":  
             r[rd] = 1 if r[rs1] < r[rs2] else 0
-        elif funct3 == "101": #srl
+        elif funct3 == "101": #slt
             sh= r[rs2] & 0b11111
             r[rd] = r[rs1] >>sh
         elif funct3 == "110": 
@@ -172,11 +250,14 @@ while x["PC"] < max_pc:
         break
     if opcode == "0110011":
         Type_R(I)
+        # x["PC"]+=4
     elif opcode == "0000011":
         Load(I)
         # x["PC"]+=4
     elif opcode == "0010011" or opcode == "1100111":
         Type_I(I)
+        # continue 
+        # x["PC"]+=4
     elif opcode == "0100011":
         # print(opcode)
         Type_S(I)
@@ -184,17 +265,20 @@ while x["PC"] < max_pc:
         # x["PC"]+=4
     elif opcode == "1100011":
         Type_B(I)
-        
+        # x[="PC"]+=4
     elif opcode == "1101111":
         Type_J(I)
+        # x["PC"]+=4
         
     elif I == "11100110000000000000000000000000":  # halt
         print("Program halted.")
 
     else:
         print("Invalid instruction")
+        # x["PC"]+=4
     r[0] = 0
     x["PC"] += 4
+    # print(x["PC"])
     Print_reg()
 Print_reg()
 Print_mem()
