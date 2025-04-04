@@ -38,9 +38,9 @@ def Type_R(I):
     if funct7 == "0000000": 
         if funct3 == "000":
             r[rd] = r[rs1] + r[rs2]
-        elif funct3 == "010":  
+        elif funct3 == "010":  #slt
             r[rd] = 1 if r[rs1] < r[rs2] else 0
-        elif funct3 == "101": #slt
+        elif funct3 == "101": #srl
             sh= r[rs2] & 0b11111
             r[rd] = r[rs1] >>sh
         elif funct3 == "110": 
