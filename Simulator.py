@@ -156,10 +156,6 @@ def Type_I(I):
     if opcode == "0010011": 
         if funct3 == "000":  
             r[rd] = r[rs1] + funct8(imm)
-        elif funct3 == "011": 
-            if int(str(funct5(r[rs1])), 2) < int(imm, 2):
-                r[rd] = 1
-
     elif opcode == "1100111": 
         if funct3 == "000":
             immd = funct8(imm) #imm_dec
@@ -181,27 +177,9 @@ def Type_B(I):
             x["PC"]-=4
     elif funct3 == "001": 
         if r[rs1] != r[rs2]:
-           
-            x["PC"] += funct8(imm[-12:]+"0")
-       
-            x["PC"]-=4
-    elif funct3 == "100": 
-        if r[rs1] < r[rs2]:
-            x["PC"] += funct8(imm[-12:]+"10")
-            x["PC"]-=4
-    elif funct3 == "101":  
-        if r[rs1] >= r[rs2]:
             x["PC"] += funct8(imm[-12:]+"0")
             x["PC"]-=4
-
-    elif funct3 == "110": 
-        if int(str(funct5(r[rs1])), 2) < int(str(funct5(r[rs2])), 2):
-            x["PC"] += funct8(imm[-12:]+"0")
-            x["PC"]-=4
-    elif funct3== "111":  
-        if int(str(funct5(r[rs1])), 2) >= int(str(funct5(r[rs2])), 2):
-            x["PC"] += funct8(imm[-12:]+"0")
-            x["PC"]-=4
+            return
 
 def Type_S(I):
 
@@ -229,7 +207,6 @@ def Print_reg():
 
 def Type_J(I):
     imm = I[0] + I[12:20] + I[11] + I[1:11]
-    
     rd = int(I[20:25], 2) 
     r[rd] = x["PC"] + 4 
     x["PC"] =x["PC"]+funct8(imm+"0")
@@ -269,10 +246,8 @@ while x["PC"] < max_pc:
     elif opcode == "1101111":
         Type_J(I)
         # x["PC"]+=4
-        
     elif I == "11100110000000000000000000000000":  # halt
         print("Program halted.")
-
     else:
         print("Invalid instruction")
         # x["PC"]+=4
